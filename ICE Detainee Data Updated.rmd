@@ -1,0 +1,211 @@
+---
+title: "ICE Detainee Data"
+output: html_document
+---
+getwd()
+setwd("/Users/anniezhang/Desktop/Research")
+```{r}
+save.image(file = "ICE.RData")
+```
+
+```{r}
+load("ICE.RData")
+```
+
+```{r}
+library(rvest) ## must download all these libraries so we can use the functions in them
+library(tidyverse)
+library(stringr)
+# URl for all the months and years
+monthYearURL <- read_html("https://trac.syr.edu/phptools/immigration/detain/table.php?stat=count&dimension=fymon&sort=keyasc") ## here is the URL for the page that has all the months and years listed out in chronological order. From this page we can construct the individual URLs for each webpage that corresponds to each month and year: the URLs are all identical, except for one aspect, the ID of the month and year.
+
+# Code for getting the ID for each month and year
+monthYearID <- monthYearURL %>% ## We are creating the variable monthYearID, which will be a vector that holds all the IDs of all the months and years. Our first step is to take our URL and feed it into...
+  html_nodes("a") %>% ## html_nodes, which extracts everything that falls under a specific node in the source code (a node is like a category in HTML). The node we're interested in is called "a", because all the IDs fall under this category.
+  html_attrs() %>% ## html_attrs pulls the attributes from a specific node (attributes provide additional information about the source code). The IDs are saved as attributes, which is why we're using this function. This function saves the attributes as a list object, which is not what we want because lists in this scenario are difficult to work with.
+  unlist() %>% ## Using unlist turns a list into a vector that looks something like this: "textgoeshere", which is easier to work with (in this scenario).
+  str_extract("\\d+") ## The actual attribute that we pull includes additional info beyond the ID, so we use the str_extract function (str is short for string) to just extract the ID.
+monthYearID ## typing out variable name prints out all the contents of the variable.
+
+# Here we are removing all the NAs from this vector.
+monthYearID <- monthYearID[-c(1, 2, 3)]
+monthYearID ## here are all the IDs for the months
+
+# Creating a data frame to that will match months with IDs.
+monthYearTotal <- monthYearURL %>% html_table() ## html_table takes our HTML object, monthYearURL, and scrapes it and saves it as a table that lists out all of the months in chronological order (along with total detained for that month). This table is saved as a list, which again we don't want. 
+monthYearTotal.df <- as.data.frame(monthYearTotal) ## turning our list into a data frame.
+monthYearTotal.df ## Printing out all the contents.
+monthYearTotal.df <- monthYearTotal.df[-1,] ## Getingt rid of the first row since it does not contain useful information.
+monthYearTotal.df <- cbind(monthYearTotal.df, as.numeric(monthYearID)) ## cbind = column bind, which lets you bind together two columns of data into some other object (a matrix, a data frame). We're binding together the months, total detained that month, and its ID.
+
+# Here we are creating vectors to hold all of our URLs. First step is to create a vector filled with URLs, and we'll go through and modify each one slightly so that it links to the correct month.
+detainedtoRepeat <- c("https://trac.syr.edu/phptools/immigration/detain/table.php?stat=count&fymon=182&dimension=trac_fac_name_county&sort=keyasc") ## going to replace the 182 in this URL with the appropriate IDs to get the correct URLs for the detained.
+detainedURLs <- rep(detainedtoRepeat, times = 195) ## we're creating a vector that's 195 copies of the above URL, and we're going to loop through our IDs and replace the ID in the above URL with the IDs so each URL will correspond to one of our 195 months.
+
+## Here we are making those modifications mentioned above
+for (i in 1:195) { 
+  detainedURLs[i] <- str_replace(detainedURLs[i], pattern = "182", replacement = monthYearID[i]) ## we assign the ith value (aka the ith URL) in our URLs vector to be the URL that has the ith ID.
+  i <- i + 1 ## then we move on to the i + 1st ID.
+}
+head(detainedURLs) ## the head(object) function prints the first six elements of the specified object, useful to check to make sure the object looks good without looking at all 195 elements in this vector. 
+
+# Loop through URLs, extract data, and name it after the corresponding month and year
+## creating a vector of months, will assign to each month its corresponding data frame.
+monthsAndYears <- c("October2002", "November2002", "December2002", "January2003", "February2003", "March2003", "April2003", "May2003", "June2003", "July2003", "August2003", "September2003", "October2003", "November2003", "December2003", "January2004", "February2004", "March2004", "April2004", "May2004", "June2004", "July2004", "August2004", "September2004", "October2004", "November2004", "December2004", "January2005", "February2005", "March2005", "April2005", "May2005", "June2005", "July2005", "August2005", "September2005", "October2005", "November2005", "December2005", "January2006", "February2006", "March2006", "April2006", "May2006", "June2006", "July2006", "August2006", "September2006", "October2006", "November2006", "December2006", "January2007", "February2007", "March2007", "April2007", "May2007", "June2007", "July2007", "August2007", "September2007", "October2007", "November2007", "December2007", "January2008", "February2008", "March2008", "April2008", "May2008", "June2008", "July2008", "August2008", "September2008", "October2008", "November2008", "December2008", "January2009", "February2009", "March2009", "April2009", "May2009", "June2009", "July2009", "August2009", "September2009", "October2009", "November2009", "December2009", "January2010", "February2010", "March2010", "April2010", "May2010", "June2010", "July2010", "August2010", "September2010", "October2010", "November2010", "December2010", "January2011", "February2011", "March2011", "April2011", "May2011", "June2011", "July2011", "August2011", "September2011", "October2011", "November2011", "December2011", "January2012", "February2012", "March2012", "April2012", "May2012", "June2012", "July2012", "August2012", "September2012", "October2012", "November2012", "December2012", "January2013", "February2013", "March2013", "April2013", "May2013", "June2013", "July2013", "August2013", "September2013", "October2013", "November2013", "December2013", "January2014", "February2014", "March2014", "April2014", "May2014", "June2014", "July2014", "August2014", "September2014", "October2014", "November2014", "December2014", "January2015", "February2015", "March2015", "April2015", "May2015", "June2015", "July2015", "August2015", "September2015", "October2015", "November2015", "December2015", "January2016", "February2016", "March2016", "April2016", "May2016", "June2016", "July2016", "August2016", "September2016", "October2016", "November2016", "December2016", "January2017", "February2017", "March2017", "April2017", "May2017", "June2017", "July2017", "August2017", "September2017", "October2017", "November2017", 
+"December2017", "January2018", "February2018", "March2018", "April2018", "May2018", "June2018", "July2018", "August2018", "September2018", "October2018", "November2018", "December2018")
+
+# Creating an empty list of lists, where each list in this list will hold one data frame. We're creating a list of lists as opposed to say, a vector of vectors, because we can place a data frame in a list, but we can't place a data frame in a vector. And then we're making it a list of lists as opposed to a vector of lists because lists are more flexible than vectors.
+list2 <- vector("list", 1) ## here we just create an empty list
+monthDataDet <- rep(list2, times = 195) ## this list will hold all our data frames; right now, the list contains a bunch of empty lists. These data frames will contain the number detained in each county and the county's ID code for each month
+
+# Here we are extracting the data and saving it to monthDataDet and monthDataCust (2 loops do to this)
+for (i in 1:195) {
+  link <- read_html(detainedURLs[i]) ## we have to turn each link to an html object to actually extract info from it
+  tempdataframe <- as.data.frame(link %>% html_table()) ## creating a temporary data frame to hold all the info on number detained by county
+  countyIDs <- link %>% html_nodes("a") %>% html_attrs() %>% unlist() %>% str_extract("\\d+") ## extracting the county ID code
+  countyIDs <- c("0000", countyIDs[-c(1, 2, 3)]) ## cleaning up the data frame for county ID code to remove extraneous info, and we add an extra row at the top (the "0000") because the first data frame we get, tempdataframe, has 1 row for each county it has info on for that month + 1 more for the totals for that month at the very top. Since we want to combine these data frames together, they must have the same number of rows, so we tack on a "0000" at the top, as though it's the county ID code for the totals for all counties. If this is hard to follow, looking at one of the data frames should clear it up!
+  monthDataDet[[i]] <- data.frame(tempdataframe, "County ID" = countyIDs, stringsAsFactors = FALSE) ## cbind = column bind, sticking two columns of data side by side; again, these are the data frames that hold number detained by county and county ID code
+  i <- i + 1 ## move on to the next set of URLs
+}
+
+# Here we are saving all of our data frames as separate .csv files by calling the write.csv function on every data frame.
+for (i in 1:195) { ## wd is research folder on desktop (you can ignore this, this is so I know where this data was saved). 
+  write.csv(monthDataDet[[i]], monthsAndYears[[i]]) ## the first argument in this function is the object to be saved, the second is what to name it as. The object to be saved is automatically saved in your working directory, which is the place on your computer R will look at when trying to read in files. You can figure out where your working directory is by typing "getwd()" and running this function. I usually abbreviate "working directory" as "wd" for convenience.
+}
+
+monthCountyCitizenship <- rep(list2, times = 204294)
+citizenshipToRep <- "https://trac.syr.edu/phptools/immigration/detain/table.php?stat=count&fymon=187&trac_fac_name_county=1844&dimension=citizenship&sort=keyasc"
+citizenshipURLs <- rep(citizenshipToRep, times = 204294)
+citizenshipDataFrameName <- rep("Month and County Name", times = 204924)
+
+## RUN THIS CODE
+k <- 1  ## this is used to insert dataframe names and urls into the appropriate positions of their respective arrays
+  for (i in 1:195) { ## start by cycling through the months
+    for (j in 2:nrow(monthDataDet[[i]])) { ## cycle through each item in each month
+      citizenshipDataFrameName[k] <- str_c(monthsAndYears[i], monthDataDet[[i]][j, 1])
+      tempURL <- str_replace(citizenshipURLs[k], pattern = "187", replacement = monthYearID[i]) ## start by replacing the month, save it as a temporary variable, and we're on the ith month
+      citizenshipURLs[k] <- str_replace(tempURL, pattern = "1844", replacement = monthDataDet[[i]][j, 3]) ## now we replace the county!
+      k <- k + 1 ## now we iterate
+    }
+  }
+
+citizenshipDataDet <- rep(list2, times = 204294) ## here is where we will save all of our data frames
+
+## function that creates data frames of any given URL
+createDF <- function(URL) {
+  link <- read_html(URL)
+  data <- link %>% html_table()
+}
+
+for (k in 1:204294) {
+  try(citizenshipDataDet[[k]] <- createDF(citizenshipURLS[k])) ## we tell R to try creating the data frame with this URL and saving the data frame; any URLs that don't work are automatically marked as an error and skipped over
+  print(k) ## just to keep track of how the function is running
+}
+
+## here is the function to check which of the items in the list are actually data frames and to reveal which ones are not
+notDF <- numeric(0) ## this vector will hold all of the indices of the objects in our list that are not data frames 
+i <- 1
+for (k in 1:204294) {
+  if (!is.data.frame(citizenshipDataDet[[k]])) {
+     notDF[i] <- k
+     i <- i + 1
+  }
+}
+
+## once we know which data frames don't exist, we can skip over those while creating the loop that will export all of our data
+
+## citizenshipURLs[97] is not a valid URL; 98 is. Look up what the 97th URL corresponds to in terms of month and county, and the 98th as well, troubleshoot from there. Add an if else statement that only does the ones that are valid URLs.  look up error handling in R
+citizenshipURLs[98]
+
+
+## now export as csv and save to dropbox (write code for this later)
+
+
+
+
+
+
+
+
+## can ignore stuff down here! will clean up later
+
+
+tstinglink <- "https://trac.syr.edu/phptools/immigration/detain/table.php?stat=count&LEA_state=25&dimension=trac_fac_name_county&sort=keyasc"
+testingvector <- rep(tstinglink, times = 4)
+testingvector <- c(testingvector, "https://trac.syr.edu/phptools/immigration/detain/table.php?stat=count&LEA_state=25&dimension=trac_fac_name_county&sort=keyascc")
+testinglist <- rep(list2, times = 5)
+
+for (i in 1:5) {
+  try(testinglist[[i]] <- as.data.frame(read_html(testingvector[i]) %>% html_table()))
+} 
+
+as.data.frame(read_html(testingvector[1]) %>% html_table())
+
+testlink <- read_html(citizenshipURLs[1])
+citizenshipDataDet[[1]] <- as.data.frame(testlink %>% html_table())
+citizenshipDataDet[[1]] #### yyayyyy this works!
+
+test1 <- read_html(citizenshipURLs[1])
+testlist <- rep(list2, times = 5)
+testlist[[1]] <- as.data.frame(test1 %>% html_table())
+testlist[[1]]
+rm(test1)
+rm(testlist)
+
+test2 <- read_html(citizenshipURLs[2])
+testlist[[2]] <- as.data.frame(test2 %>% html_table())
+testlist[[2]]
+rm(test2)
+rm(test3)
+rm(test4)
+rm(testlink)
+
+test3 <- read_html(citizenshipURLs[52])
+testlist[[3]] <- as.data.frame(test3 %>% html_table())
+testlist[[3]]
+
+test4 <- read_html(citizenshipURLs[1000])
+testlist[[4]] <- as.data.frame(test4 %>% html_table())
+testlist[[4]]
+citizenshipURLs
+citizenshipDataFrameName
+
+nrow(monthDataDet[[1]]) - 1
+class(monthsAndYears[1])
+monthsAndYears[1]
+
+str_c(monthsAndYears[1], monthDataDet[[1]][2, 1])
+class(monthYearID[1])
+class(monthDataDet[[1]][2, 3]) ## this needs to be a string, not a factor
+
+## double check this loop!
+randvec <- rep(4, times = 10)
+
+for (j in 2:8) {
+  randvec[j] <- 2
+}
+randvec
+
+monthDataDet[[1]][2, 1]
+monthDataDet[[i]][j, 3]
+
+#https://trac.syr.edu/phptools/immigration/detain/table.php?stat=count&fymon=136&trac_fac_name_county=2246&dimension=citizenship&sort=keyasc
+
+# could try getting the titles from here? https://trac.syr.edu/phptools/immigration/detain/graph.php?stat=count&timescale=fymon&fymon=182&trac_fac_name_county=1819&timeunit=number
+
+testName <- read_html("https://trac.syr.edu/phptools/immigration/detain/graph.php?stat=count&timescale=fymon&fymon=182&trac_fac_name_county=1819&timeunit=number")
+testString <- testName %>% html_node("body") %>% html_text(trim = TRUE) %>% unlist()
+
+x <- monthYearTotal.df[195, 1]
+
+temporary <- numeric(195)
+for (i in 1:195) {
+  temporary[i] <- nrow(monthDataDet[[i]]) - 1
+}
+
+sum(temporary)
+
+monthDataDet[[1]]
+
+```  
+Up next: concatenating everything.
